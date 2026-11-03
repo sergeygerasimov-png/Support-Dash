@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <title>Refund Metrics</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.2/plotly.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <h1>Refund metrics</h1>
+      <span id="asof" class="muted">Loading data…</span>
+    </div>
+    <div class="filters" id="filters">
+      <label class="field">
+        <span>Time step</span>
+        <select id="step">
+          <option value="day">Day</option>
+          <option value="week" selected>Week</option>
+          <option value="month">Month</option>
+          <option value="quarter">Quarter</option>
+          <option value="year">Year</option>
+        </select>
+      </label>
+      <div class="field">
+        <span>Period</span>
+        <div class="period">
+          <input type="date" id="start" aria-label="Period start">
+          <span class="muted">–</span>
+          <input type="date" id="end" aria-label="Period end">
+        </div>
+      </div>
+      <div class="field">
+        <span>&nbsp;</span>
+        <div class="presets" id="presets">
+          <button data-preset="28d">4W</button>
+          <button data-preset="3m">3M</button>
+          <button data-preset="6m">6M</button>
+          <button data-preset="ytd">YTD</button>
+          <button data-preset="all">All</button>
+        </div>
+      </div>
+      <div class="field">
+        <span>Product</span>
+        <details class="multi" id="f-product"><summary>All</summary><div class="menu"></div></details>
+      </div>
+      <div class="field">
+        <span>Payment type</span>
+        <details class="multi" id="f-payment_type"><summary>All</summary><div class="menu"></div></details>
+      </div>
+      <div class="field" title="Applies to refunds only; all payments always count in the refund-rate denominator">
+        <span>Refund type</span>
+        <details class="multi" id="f-refund_type"><summary>All</summary><div class="menu"></div></details>
+      </div>
+      <div class="field" title="Applies to the support charts and the support tiles">
+        <span>Support agent</span>
+        <details class="multi wide" id="f-agent"><summary>All</summary><div class="menu"></div></details>
+      </div>
+    </div>
+    <nav class="tabs" id="tabs" aria-label="Charts"></nav>
+  </header>
+
+  <main>
+    <div id="loading" class="loading">
+      <div class="spinner"></div>
+      <p id="loading-text">Loading DuckDB and the refunds dataset…</p>
+    </div>
+
+    <section class="kpis" id="kpis" hidden></section>
+    <div id="page" hidden></div>
+
+    <footer class="muted notes">
+      <p>Refunds are dated by refund time, transactions by payment time: a period's rate is
+        <em>refunds issued in the period / revenue taken in the period</em>, not a cohort rate.
+        The last period is usually incomplete. Breakdowns show the top 7 segments; the rest are combined into
+        “Other segments” (Σ numerator / Σ denominator, not an average of rates).
+        Support metrics use <code>type = 'refund'</code> rows only, so agent-handled refunds are not counted twice.</p>
+    </footer>
+  </main>
+
+  <template id="page-tpl">
+    <article class="page">
+      <div class="page-head">
+        <div>
+          <h2 class="title"></h2>
+          <p class="desc muted"></p>
+          <p class="ref-note muted" hidden><span class="ref-key"></span> dotted line: all segments combined</p>
+          <p class="ref-note partial-note muted" hidden><span class="partial-key"></span> shaded: last period is incomplete</p>
+        </div>
+        <div class="card-controls">
+          <label class="field metric-field" hidden><span>Metric</span><select class="metric"></select></label>
+          <label class="field breakdown-field" hidden><span>Breakdown</span><select class="breakdown"></select></label>
+          <label class="field"><span class="breakdown2-label">Then by</span><select class="breakdown2"></select></label>
+          <label class="toggle"><input type="checkbox" class="labels" checked> Labels</label>
+          <label class="toggle shared-y-field"><input type="checkbox" class="shared-y" checked> Same y scale</label>
+          <div class="seg" role="group" aria-label="View">
+            <button class="view on" data-view="chart">Chart</button>
+            <button class="view" data-view="table">Table</button>
+          </div>
+          <button class="csv" title="Download as CSV">CSV</button>
+        </div>
+      </div>
+      <div class="figs"></div>
+      <div class="table-wrap" hidden></div>
+    </article>
+  </template>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

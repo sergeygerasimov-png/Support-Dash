@@ -1,0 +1,7 @@
+# never publish: plain data, the decryption key, notebooks (demo.ipynb holds a DB password)
+data/*.parquet
+data/.key
+*.ipynb
+.ipynb_checkpoints/
+__pycache__/
+.DS_Store
