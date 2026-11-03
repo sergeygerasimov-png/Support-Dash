@@ -15,6 +15,7 @@ const BREAKDOWNS = {
 };
 const FILTERS = ['product', 'payment_type'];
 const TOP_N = 7;
+const MAX_SEGMENTS = 48; // "All" still folds the tail into Other beyond this, so geo (~235 countries) stays usable
 const OTHER = 'Other segments';
 
 // derived columns of the notebook's `d`, as SQL expressions over the raw rows
@@ -63,7 +64,7 @@ const CHARTS = [
     desc: "Agent's refunded orders / all support_request refunded orders in the period. Below 100% because some refunds have no agent." },
   { id: 'support-agent', title: 'Support agent', metrics: ['support_refund_rate_agent'],
     desc: "Agent's support_request + pointai refund $ / the period's total. Segments of a date add up to 100%." },
-  { id: 'support-reason', title: 'Support by reason', metrics: ['support_refund_rate_reason'],
+  { id: 'support-reason', title: 'Support by reason', metrics: ['support_refund_rate_reason'], showAll: true, sharedY: false,
     desc: "Reason's support_request + pointai refund $ / the period's total (reason cleaned as in Tableau)." },
 ];
 
@@ -139,7 +140,7 @@ const agentCond = () =>
   state.agent.length ? `support_agent_email IN (${state.agent.map(q).join(', ')})` : null;
 
 // -> [{d, seg, num, den}], same as compute() in the notebook; breakdown2 splits each segment further ("A · B")
-async function compute(metric, breakdown, breakdown2) {
+async function compute(metric, breakdown, breakdown2, limit = TOP_N) {
   const spec = METRICS[metric];
   const [numCol, numAgg] = spec.num;
   const [denCol, denAgg] = spec.den;
@@ -156,7 +157,7 @@ async function compute(metric, breakdown, breakdown2) {
     : "'all'";
   const top = cols.length
     ? `, top AS (SELECT ${key} AS s FROM f WHERE ${COLS[rankCol]} IS NOT NULL AND ${inScope}
-                 GROUP BY 1 ORDER BY count(*) DESC, 1 LIMIT ${TOP_N})`
+                 GROUP BY 1 ORDER BY count(*) DESC, 1 LIMIT ${limit})`
     : '';
   const totals = spec.total
     ? `, n AS (SELECT d, seg, ${agg(numCol, numAgg)} AS num FROM g
@@ -257,7 +258,8 @@ class Chart {
     this.breakdown = 'general';
     this.breakdown2 = 'general';
     this.labels = true;
-    this.sharedY = true;
+    this.sharedY = def.sharedY ?? true;
+    this.showAll = Boolean(def.showAll);
     this.view = 'chart';
     this.colorSlots = new Map(); // segment -> palette slot, kept across re-renders so colors follow the entity
     this.data = [];
@@ -292,7 +294,11 @@ class Chart {
     const labels = $('.labels', el);
     labels.onchange = () => { this.labels = labels.checked; this.draw(); };
     const shared = $('.shared-y', el);
+    shared.checked = this.sharedY;
     shared.onchange = () => { this.sharedY = shared.checked; this.draw(); };
+    const topSel = $('.top-n', el);
+    topSel.value = this.showAll ? 'all' : 'top';
+    topSel.onchange = () => { this.showAll = topSel.value === 'all'; this.update(); };
     el.querySelectorAll('.view').forEach((b) => {
       b.onclick = () => {
         this.view = b.dataset.view;
@@ -311,7 +317,7 @@ class Chart {
     const token = (this.token = {});
     this.el.classList.add('busy');
     try {
-      const data = await compute(this.metric, this.breakdown, this.breakdown2);
+      const data = await compute(this.metric, this.breakdown, this.breakdown2, this.showAll ? MAX_SEGMENTS : TOP_N);
       // share-of-period metrics add up to 100% per date, so a combined line means nothing there
       const overall = this.hasSegments() && !METRICS[this.metric].total
         ? await compute(this.metric, 'general', 'general') : null;
@@ -338,6 +344,10 @@ class Chart {
   }
 
   colors(segs) {
+    // more segments than palette slots: one color for all figures (each is titled), never generated hues
+    if (segs.filter((s) => s !== OTHER).length > SLOTS.length) {
+      return Object.fromEntries(segs.map((s) => [s, s === OTHER ? css('--other') : css(SLOTS[0])]));
+    }
     const used = new Set();
     const out = {};
     for (const s of segs) {
@@ -453,8 +463,13 @@ class Chart {
         xaxis: { type: 'date', range: xRange(dates[0], last), gridcolor: css('--grid'), linecolor: css('--axis'),
                  tickfont: { color: muted }, hoverformat: '%Y-%m-%d', zeroline: false,
                  ...xTicks(dates.length, single ? 12 : 6) },
-        yaxis: { tickformat: '.1%', gridcolor: css('--grid'), linecolor: css('--axis'), tickfont: { color: muted },
-                 zeroline: false, nticks: single ? 8 : 5, ...(yRange ? { range: yRange } : {}) },
+        // tiny shares (e.g. 0.04%) need two decimals, or ticks repeat as "0.0%, 0.0%, 0.1%"
+        yaxis: { tickformat: (yRange ? yRange[1] : Math.max(...pts.map((r) => r.value))) < 0.03 ? '.2%' : '.1%',
+                 gridcolor: css('--grid'), linecolor: css('--axis'), tickfont: { color: muted },
+                 zeroline: false, nticks: single ? 8 : 5,
+                 // rates can't go below 0; a lone point would otherwise get a -50%..100% axis
+                 ...(yRange ? { range: yRange }
+                   : pts.length === 1 ? { range: [0, pts[0].value * 2 || 0.01] } : { rangemode: 'nonnegative' }) },
         showlegend: false,
         shapes,
         // small figures carry the shading only; the note in the page head names it

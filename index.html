@@ -76,7 +76,7 @@
     <footer class="muted notes">
       <p>Refunds are dated by refund time, transactions by payment time: a period's rate is
         <em>refunds issued in the period / revenue taken in the period</em>, not a cohort rate.
-        The last period is usually incomplete. Breakdowns show the top 7 segments; the rest are combined into
+        The last period is usually incomplete. Breakdowns show the top 7 segments unless “Segments: All” is picked (up to 48); the rest are combined into
         “Other segments” (Σ numerator / Σ denominator, not an average of rates).
         Support metrics use <code>type = 'refund'</code> rows only, so agent-handled refunds are not counted twice.</p>
     </footer>
@@ -95,6 +95,8 @@
           <label class="field metric-field" hidden><span>Metric</span><select class="metric"></select></label>
           <label class="field breakdown-field" hidden><span>Breakdown</span><select class="breakdown"></select></label>
           <label class="field"><span class="breakdown2-label">Then by</span><select class="breakdown2"></select></label>
+          <label class="field"><span>Segments</span>
+            <select class="top-n"><option value="top">Top 7</option><option value="all">All</option></select></label>
           <label class="toggle"><input type="checkbox" class="labels" checked> Labels</label>
           <label class="toggle shared-y-field"><input type="checkbox" class="shared-y" checked> Same y scale</label>
           <div class="seg" role="group" aria-label="View">
